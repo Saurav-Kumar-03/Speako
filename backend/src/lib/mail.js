@@ -1,6 +1,10 @@
 import nodemailer from "nodemailer";
 
-export const sendOtpEmail = async (email, otp) => {
+let transporter = null;
+
+const getTransporter = () => {
+  if (transporter) return transporter;
+
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS;
 
@@ -10,13 +14,23 @@ export const sendOtpEmail = async (email, otp) => {
     );
   }
 
-  const transporter = nodemailer.createTransport({
+  transporter = nodemailer.createTransport({
     service: "gmail",
+    pool: true, // Reuse open connection pool for fast subsequent dispatches
+    maxConnections: 3,
+    maxMessages: 50,
     auth: {
       user: emailUser.trim(),
       pass: emailPass.replace(/\s+/g, ""),
     },
   });
+
+  return transporter;
+};
+
+export const sendOtpEmail = async (email, otp) => {
+  const mailTransporter = getTransporter();
+  const emailUser = process.env.EMAIL_USER?.trim();
 
   const mailOptions = {
     from: `"Speako" <${emailUser}>`,
@@ -43,5 +57,5 @@ export const sendOtpEmail = async (email, otp) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await mailTransporter.sendMail(mailOptions);
 };
