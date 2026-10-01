@@ -1,17 +1,20 @@
-import express  from "express";
-import { signup,login,logout, onboard } from "../controllers/authController.js";
+import express from "express";
+import { signup, verifyOtp, resendOtp, login, logout, onboard } from "../controllers/authController.js";
 import { protectRoute } from "../middleware/authMiddleware.js";
+
 const router = express.Router();
 
+router.post("/signup", signup);
+router.post("/verify-otp", verifyOtp);
+router.post("/resend-otp", resendOtp);
+router.post("/login", login);
+router.post("/Login", login);
+router.post("/logout", logout);
+router.post("/Logout", logout);
 
-router.post("/signup",signup);
-router.post("/Login",login);
-router.post("/Logout",logout);//Logout is a POST because it changes authentication state(state of server side ) and must be done intentionally and securely.
+router.post("/onboarding", protectRoute, onboard);
+router.get("/me", protectRoute, (req, res) => {
+  return res.status(200).json({ success: true, user: req.user });
+});
 
-
-router.post("/onboarding",protectRoute,onboard);
-//check if user logged in or not
-router.get("/me",protectRoute,(req,res)=>{
-   return res.status(200).json({success:true,user:req.user});
-})
 export default router;
