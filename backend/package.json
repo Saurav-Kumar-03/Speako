@@ -23,6 +23,7 @@
     "multer": "^2.0.1",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^10.0.12",
+    "resend": "^6.31.0",
     "speako": "file:..",
     "stream-chat": "^8.60.0"
   },
