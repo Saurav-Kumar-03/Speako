@@ -60,6 +60,34 @@ const getEmailHtml = (otp) => `
 `;
 
 export const sendOtpEmail = async (email, otp) => {
+  // Option 1: Google Apps Script Webhook (Over HTTPS / Port 443 - Can send to ANY email without domain verification)
+  if (process.env.GMAIL_WEBHOOK_URL) {
+    try {
+      const response = await fetch(process.env.GMAIL_WEBHOOK_URL.trim(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: email,
+          subject: "Your Speako Verification Code",
+          html: getEmailHtml(otp),
+          otp,
+        }),
+        redirect: "follow",
+      });
+
+      const result = await response.json().catch(() => ({ status: "success" }));
+      if (result && result.status === "error") {
+        throw new Error(result.message || "Failed to send email via Gmail Webhook");
+      }
+
+      return result;
+    } catch (webhookError) {
+      console.error("Gmail Webhook error:", webhookError.message);
+      throw new Error(`Failed to send verification email: ${webhookError.message}`);
+    }
+  }
+
+  // Option 2: Resend API (Over HTTPS / Port 443)
   const resend = getResendClient();
 
   if (resend) {
