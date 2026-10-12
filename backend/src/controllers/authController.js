@@ -4,7 +4,8 @@ import jwt from "jsonwebtoken";
 import { upsertStreamUser } from "../lib/stream.js";
 import User from "../models/User.js";
 import PendingUser from "../models/PendingUser.js";
-import { sendOtpEmail } from "../lib/mail.js";
+import PasswordReset from "../models/PasswordReset.js";
+import { sendOtpEmail, sendPasswordResetEmail } from "../lib/mail.js";
 
 export async function signup(req, res) {
   const { email, password, fullName } = req.body;
@@ -206,9 +207,11 @@ export async function verifyOtp(req, res) {
     await PendingUser.deleteOne({ _id: pendingUser._id });
 
     // Generate JWT and set cookie
-    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET_KEY, {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign(
+      { userId: newUser._id, tokenVersion: newUser.tokenVersion || 0 },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "7d" }
+    );
 
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -305,9 +308,11 @@ export async function login(req, res) {
     const isPasswordCorrect = await user.matchPassword(password);
     if (!isPasswordCorrect) return res.status(401).json({ message: "Invalid email or password" });
 
-    const token = jwt.sign({ userId: user?._id }, process.env.JWT_SECRET_KEY, {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign(
+      { userId: user._id, tokenVersion: user.tokenVersion || 0 },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "7d" }
+    );
 
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -383,5 +388,252 @@ export async function onboard(req, res) {
   } catch (error) {
     console.log("Error in onboard controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function forgotPassword(req, res) {
+  const { email } = req.body;
+  try {
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const emailParts = normalizedEmail.split("@");
+    if (emailParts.length !== 2 || emailParts[1] !== "gmail.com") {
+      return res.status(400).json({ message: "Only @gmail.com email addresses are allowed" });
+    }
+
+    const genericResponse = {
+      success: true,
+      message: "If an account with that email exists, a verification code has been sent.",
+      email: normalizedEmail,
+    };
+
+    // Check if account exists
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      // Perform dummy crypto work to mitigate timing-based enumeration attacks
+      const dummySalt = crypto.randomBytes(16).toString("hex");
+      crypto.createHash("sha256").update(dummySalt).digest("hex");
+      return res.status(200).json(genericResponse);
+    }
+
+    // Check existing reset session for cooldown and resend limit
+    const existingReset = await PasswordReset.findOne({ email: normalizedEmail });
+    if (existingReset) {
+      const timeSinceLast = Date.now() - new Date(existingReset.lastOtpSentAt).getTime();
+      if (timeSinceLast < 60 * 1000) {
+        const remainingSeconds = Math.ceil((60 * 1000 - timeSinceLast) / 1000);
+        return res.status(429).json({
+          message: `A verification code was recently sent. Please wait ${remainingSeconds} seconds before requesting a new code.`,
+        });
+      }
+
+      if (existingReset.resendCount >= 3) {
+        return res.status(429).json({
+          message: "Maximum verification code requests reached for this session. Please try again later.",
+        });
+      }
+    }
+
+    // Generate secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    const resendCount = existingReset ? existingReset.resendCount + 1 : 0;
+
+    await PasswordReset.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        email: normalizedEmail,
+        otpHash,
+        otpExpiresAt,
+        otpAttempts: 0,
+        lastOtpSentAt: new Date(),
+        resendCount,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        isConsumed: false,
+        consumedAt: null,
+        createdAt: new Date(),
+      },
+      { upsert: true, new: true, runValidators: true }
+    );
+
+    try {
+      await sendPasswordResetEmail(normalizedEmail, otp);
+    } catch (mailError) {
+      console.error("Failed to send password reset email:", mailError.message);
+      await PasswordReset.deleteOne({ email: normalizedEmail });
+      return res.status(502).json({
+        message: "Failed to send verification email. " + mailError.message,
+      });
+    }
+
+    return res.status(200).json(genericResponse);
+  } catch (error) {
+    console.error("Error in forgotPassword controller:", error.message);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function verifyResetOtp(req, res) {
+  const { email, otp } = req.body;
+  try {
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and verification code are required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const cleanOtp = otp.toString().trim();
+
+    if (cleanOtp.length !== 6) {
+      return res.status(400).json({ message: "Verification code must be 6 digits" });
+    }
+
+    const resetSession = await PasswordReset.findOne({ email: normalizedEmail });
+    if (!resetSession) {
+      return res.status(400).json({
+        message: "Verification session expired or not found. Please request a new code.",
+      });
+    }
+
+    if (resetSession.isConsumed) {
+      return res.status(400).json({
+        message: "This verification session has already been used. Please request a new code.",
+      });
+    }
+
+    // Check maximum failed attempts
+    if (resetSession.otpAttempts >= 5) {
+      await PasswordReset.deleteOne({ _id: resetSession._id });
+      return res.status(400).json({
+        message: "Too many failed attempts. Reset session cancelled. Please request a new code.",
+      });
+    }
+
+    // Explicit application-level expiry check
+    if (new Date() > resetSession.otpExpiresAt) {
+      await PasswordReset.deleteOne({ _id: resetSession._id });
+      return res.status(400).json({
+        message: "Verification code has expired. Please request a new code.",
+      });
+    }
+
+    // Verify OTP using constant-time hash comparison
+    const submittedOtpHash = crypto.createHash("sha256").update(cleanOtp).digest("hex");
+    let isMatch = false;
+    try {
+      isMatch = crypto.timingSafeEqual(
+        Buffer.from(submittedOtpHash, "hex"),
+        Buffer.from(resetSession.otpHash, "hex")
+      );
+    } catch {
+      isMatch = false;
+    }
+
+    if (!isMatch) {
+      const updatedAttempts = resetSession.otpAttempts + 1;
+      if (updatedAttempts >= 5) {
+        await PasswordReset.deleteOne({ _id: resetSession._id });
+        return res.status(400).json({
+          message: "Too many failed attempts. Reset session cancelled. Please request a new code.",
+        });
+      }
+
+      await PasswordReset.updateOne({ _id: resetSession._id }, { $inc: { otpAttempts: 1 } });
+      const remainingAttempts = 5 - updatedAttempts;
+      return res.status(400).json({
+        message: `Invalid verification code. ${remainingAttempts} attempts remaining.`,
+      });
+    }
+
+    // Generate single-use reset authorization token (32 bytes = 64 hex chars)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+    const resetTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes expiry
+
+    resetSession.resetTokenHash = resetTokenHash;
+    resetSession.resetTokenExpiresAt = resetTokenExpiresAt;
+    resetSession.otpHash = "used"; // Invalidate OTP so it cannot be reused
+    await resetSession.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification code confirmed.",
+      resetToken,
+    });
+  } catch (error) {
+    console.error("Error in verifyResetOtp controller:", error.message);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function resetPassword(req, res) {
+  const { resetToken, newPassword } = req.body;
+  try {
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ message: "Reset token and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const cleanToken = resetToken.toString().trim();
+    const resetTokenHash = crypto.createHash("sha256").update(cleanToken).digest("hex");
+
+    // Atomically find and consume the reset session (concurrency-safe & genuinely single-use)
+    const resetSession = await PasswordReset.findOneAndUpdate(
+      {
+        resetTokenHash,
+        isConsumed: false,
+        resetTokenExpiresAt: { $gt: new Date() },
+      },
+      {
+        isConsumed: true,
+        consumedAt: new Date(),
+      },
+      { new: false }
+    );
+
+    if (!resetSession) {
+      return res.status(400).json({
+        message: "Invalid or expired password reset token. Please request a new code.",
+      });
+    }
+
+    const user = await User.findOne({ email: resetSession.email });
+    if (!user) {
+      return res.status(404).json({ message: "User account not found" });
+    }
+
+    // Update password (plain text so pre-save hook properly hashes with salt)
+    // and bump tokenVersion to invalidate all existing user sessions
+    user.password = newPassword;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    // Clean up reset session
+    await PasswordReset.deleteOne({ _id: resetSession._id });
+
+    // Clear any active auth cookie
+    res.clearCookie("jwt");
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. Please log in with your new password.",
+    });
+  } catch (error) {
+    console.error("Error in resetPassword controller:", error.message);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }

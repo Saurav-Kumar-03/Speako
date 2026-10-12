@@ -21,6 +21,18 @@ export const protectRoute = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized - User not found" });
     }
 
+    // Backward-compatible tokenVersion check for session invalidation
+    const userTokenVersion = user.tokenVersion || 0;
+    if (decoded.tokenVersion === undefined) {
+      if (userTokenVersion > 0) {
+        res.clearCookie("jwt");
+        return res.status(401).json({ message: "Unauthorized - Session expired. Please log in again." });
+      }
+    } else if (decoded.tokenVersion !== userTokenVersion) {
+      res.clearCookie("jwt");
+      return res.status(401).json({ message: "Unauthorized - Session expired. Please log in again." });
+    }
+
     if (user.profilePic && user.profilePic.includes("avatar.iran.liara.run")) {
       const seed = Math.random().toString(36).substring(2, 10);
       user.profilePic = `https://api.dicebear.com/9.x/avataaars/png?seed=${seed}`;

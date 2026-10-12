@@ -1,5 +1,15 @@
 import express from "express";
-import { signup, verifyOtp, resendOtp, login, logout, onboard } from "../controllers/authController.js";
+import {
+  signup,
+  verifyOtp,
+  resendOtp,
+  login,
+  logout,
+  onboard,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
+} from "../controllers/authController.js";
 import { protectRoute } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -7,6 +17,9 @@ const router = express.Router();
 router.post("/signup", signup);
 router.post("/verify-otp", verifyOtp);
 router.post("/resend-otp", resendOtp);
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-reset-otp", verifyResetOtp);
+router.post("/reset-password", resetPassword);
 router.post("/login", login);
 router.post("/Login", login);
 router.post("/logout", logout);

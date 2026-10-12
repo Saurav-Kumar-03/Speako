@@ -20,6 +20,21 @@ export const login = async (loginData) => {
     return response.data;
 }
 
+export const forgotPassword = async (emailData) => {
+    const response = await axiosInstance.post("/auth/forgot-password", emailData);
+    return response.data;
+}
+
+export const verifyResetOtp = async (verifyData) => {
+    const response = await axiosInstance.post("/auth/verify-reset-otp", verifyData);
+    return response.data;
+}
+
+export const resetPassword = async (resetData) => {
+    const response = await axiosInstance.post("/auth/reset-password", resetData);
+    return response.data;
+}
+
 export const logout = async () => {
    try{
      const response = await axiosInstance.post("/auth/logout");

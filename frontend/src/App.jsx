@@ -13,6 +13,7 @@ import useAuthUser from './hooks/useAuthUser.js'
 import Layout from './components/Layout.jsx'
 import { useThemeStore } from './store/useThemeStore.js'
 import FriendsPage from './pages/FriendPage.jsx'
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -50,6 +51,12 @@ const App = () => {
           path="/login"
           element={
             !isAuthenticated ? <LoginPage /> : <Navigate to={isOnboarded ? "/" : "/onboarding"} />
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            !isAuthenticated ? <ForgotPasswordPage /> : <Navigate to={isOnboarded ? "/" : "/onboarding"} />
           }
         />
         <Route path="/notifications" element={isAuthenticated && isOnboarded ? (

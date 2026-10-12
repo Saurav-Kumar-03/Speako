@@ -61,9 +61,17 @@ const LoginPage = () => {
                   </div>
 
                   <div className="form-control w-full space-y-2">
-                    <label className="label">
-                      <span className="label-text">Password</span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="label p-0">
+                        <span className="label-text">Password</span>
+                      </label>
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-primary hover:underline font-medium"
+                      >
+                        Forgot Password?
+                      </Link>
+                    </div>
                     <input
                       type="password"
                       placeholder="Enter Your Password"
