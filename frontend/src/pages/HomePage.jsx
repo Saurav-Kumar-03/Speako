@@ -15,9 +15,11 @@ import FriendCard, { getLanguageFlag } from "../components/FriendCard";
 import NoFriendsFound from "../components/NoFriendsFound";
 import toast from "react-hot-toast";
 import useAuthUser from "../hooks/useAuthUser";
+import { useNotifications } from "../context/NotificationContext";
 
 const HomePage = () => {
   const { authUser } = useAuthUser();
+  const { pendingFriendRequestCount } = useNotifications();
   const queryClient = useQueryClient();
   const [outgoingRequestsIds, setOutgoingRequestsIds] = useState(new Set());
 
@@ -96,6 +98,11 @@ const HomePage = () => {
           <Link to="/notifications" className="btn btn-outline btn-sm">
             <UsersIcon className="mr-2 size-4" />
             Friend Requests
+            {pendingFriendRequestCount > 0 && (
+              <span className="badge badge-primary badge-sm ml-2 font-bold">
+                {pendingFriendRequestCount > 99 ? "99+" : pendingFriendRequestCount}
+              </span>
+            )}
           </Link>
         </div>
 

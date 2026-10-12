@@ -5,8 +5,10 @@ import { getUserFriends } from "../lib/api";
 import FriendCard from "../components/FriendCard";
 import NoFriendsFound from "../components/NoFriendsFound";
 import { UsersIcon } from "lucide-react";
+import { useNotifications } from "../context/NotificationContext";
 
 const FriendsPage = () => {
+  const { pendingFriendRequestCount } = useNotifications();
   const { data: friends = [], isLoading: loadingFriends } = useQuery({
     queryKey: ["friends"],
     queryFn: getUserFriends,
@@ -20,6 +22,11 @@ const FriendsPage = () => {
           <Link to="/notifications" className="btn btn-outline btn-sm">
             <UsersIcon className="mr-2 size-4" />
             Friend Requests
+            {pendingFriendRequestCount > 0 && (
+              <span className="badge badge-primary badge-sm ml-2 font-bold">
+                {pendingFriendRequestCount > 99 ? "99+" : pendingFriendRequestCount}
+              </span>
+            )}
           </Link>
         </div>
 

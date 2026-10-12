@@ -2,11 +2,15 @@ import React from 'react'
 import useAuthUser from '../hooks/useAuthUser'
 import { Link, useLocation } from 'react-router';
 import { BellIcon, HomeIcon, ShipWheelIcon, UsersIcon } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
 
 const Sidebar = () => {
     const {authUser} =useAuthUser();
+    const {totalNotificationCount} = useNotifications();
     const location=useLocation();
     const currentPath=location.pathname;
+
+    const badgeText = totalNotificationCount > 99 ? "99+" : totalNotificationCount;
 
   return (
   <aside className="w-64 bg-base-200 border-r border-base-300 hidden lg:flex flex-col h-screen sticky top-0" >
@@ -41,12 +45,19 @@ const Sidebar = () => {
 
         <Link
           to="/notifications"
-          className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+          className={`btn btn-ghost justify-between w-full px-3 normal-case ${
             currentPath === "/notifications" ? "btn-active" : ""
           }`}
         >
-          <BellIcon className="size-5 text-base-content opacity-70" />
-          <span>Notifications</span>
+          <div className="flex items-center gap-3">
+            <BellIcon className="size-5 text-base-content opacity-70" />
+            <span>Notifications</span>
+          </div>
+          {totalNotificationCount > 0 && (
+            <span className="badge badge-primary badge-sm font-bold">
+              {badgeText}
+            </span>
+          )}
         </Link>
       </nav>
 

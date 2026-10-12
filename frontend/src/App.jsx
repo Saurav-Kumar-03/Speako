@@ -14,6 +14,7 @@ import Layout from './components/Layout.jsx'
 import { useThemeStore } from './store/useThemeStore.js'
 import FriendsPage from './pages/FriendPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
+import { NotificationProvider } from './context/NotificationContext.jsx'
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -27,8 +28,8 @@ const App = () => {
 
   return (
     <div className="min-h-screen" data-theme={theme}>
-
-      <Routes>
+      <NotificationProvider>
+        <Routes>
         <Route path="/" element={isAuthenticated && isOnboarded ?(<Layout showSidebar={true}><HomePage/></Layout>):(<Navigate to={!isAuthenticated?"/login":"/onboarding"}/>)}/>
 
         <Route
@@ -99,8 +100,7 @@ const App = () => {
           }
         />
       </Routes>
-
-
+      </NotificationProvider>
 
       <Toaster />
     </div>

@@ -82,14 +82,18 @@ import {
 
 import ThemeSelector from "./ThemeSelector";
 import useLogout from "../hooks/useLogout";
+import { useNotifications } from "../context/NotificationContext";
 
 const Navbar = () => {
   const { authUser } = useAuthUser();
+  const { totalNotificationCount } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
   const { logoutMutation } = useLogout();
   const isChatPage = location.pathname?.startsWith("/chat");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const badgeText = totalNotificationCount > 99 ? "99+" : totalNotificationCount;
 
   const handleNav = (path) => {
     navigate(path);
@@ -116,8 +120,13 @@ const Navbar = () => {
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Notification - only sm+ */}
             <Link to="/notifications" className="hidden sm:inline-flex">
-              <button className="btn btn-ghost btn-circle">
+              <button className="btn btn-ghost btn-circle relative" aria-label="Notifications">
                 <BellIcon className="h-6 w-6 text-base-content opacity-70" />
+                {totalNotificationCount > 0 && (
+                  <span className="badge badge-primary badge-xs absolute top-1.5 right-1.5 font-bold min-w-4 h-4 px-1 flex items-center justify-center animate-pulse">
+                    {badgeText}
+                  </span>
+                )}
               </button>
             </Link>
 
@@ -211,9 +220,19 @@ const Navbar = () => {
                       </button>
                     </li>
                     <li>
-                      <button onClick={() => handleNav("/notifications")}>
-                        <BellIcon className="size-4 mr-2" />
-                        Notifications
+                      <button
+                        onClick={() => handleNav("/notifications")}
+                        className="flex items-center justify-between w-full"
+                      >
+                        <span className="flex items-center">
+                          <BellIcon className="size-4 mr-2" />
+                          Notifications
+                        </span>
+                        {totalNotificationCount > 0 && (
+                          <span className="badge badge-primary badge-sm font-bold">
+                            {badgeText}
+                          </span>
+                        )}
                       </button>
                     </li>
                     <li>

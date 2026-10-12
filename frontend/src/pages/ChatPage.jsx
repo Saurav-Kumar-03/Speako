@@ -1,72 +1,56 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import useAuthUser from '../hooks/useAuthUser';
-import { useQuery } from '@tanstack/react-query';
-import { getStreamToken } from '../lib/api';
-
-// import { Chat, Channel, ChannelHeader, MessageInput, MessageList, Thread, Window } from 'stream-chat-react';
-import {Channel, ChannelHeader, Chat, MessageInput, MessageList, Window} from 'stream-chat-react';
-import { StreamChat } from 'stream-chat';
+import { Channel, ChannelHeader, Chat, MessageInput, MessageList, Window } from 'stream-chat-react';
 import toast from 'react-hot-toast';
 import ChatLoader from '../components/ChatLoader';
 import CallButton from '../components/CallButton';
-
-const STREAM_API_KEY=import.meta.env.VITE_STREAM_API_KEY;
-
+import { useNotifications } from '../context/NotificationContext';
 
 const ChatPage = () => {
+  const { id: targetUserId } = useParams();
+  const { authUser } = useAuthUser();
+  const { chatClient, isChatReady, setActiveChatUserId } = useNotifications();
 
-  const {id:targetUserId}=useParams();
+  const [channel, setChannel] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [chatClient,setChatClient]=useState(null);
-  const [channel,setChannel]=useState(null);
-  const [loading,setLoading]=useState(true);
+  // Set active chat user to suppress toast notifications for this conversation
+  useEffect(() => {
+    if (targetUserId) {
+      setActiveChatUserId(targetUserId);
+    }
+    return () => {
+      setActiveChatUserId(null);
+    };
+  }, [targetUserId, setActiveChatUserId]);
 
-  const {authUser}=useAuthUser();
-  const {data:tokenData}=useQuery({
-    queryKey: ['streamToken'],
-    queryFn:getStreamToken,
-    enabled:!!authUser//this will run only when authUser is availble
-  })
+  useEffect(() => {
+    const initChannel = async () => {
+      if (!chatClient || !isChatReady || !authUser || !targetUserId) return;
 
-      useEffect(()=>{
-        const initChat=async()=>{
-              if(!tokenData?.token || !authUser) return ;
+      try {
+        setLoading(true);
+        const channelId = [authUser._id, targetUserId].sort().join("_");
 
-              try{
-                console.log("Initializing stream chat client...");
+        const currChannel = chatClient.channel("messaging", channelId, {
+          members: [authUser._id, targetUserId],
+        });
 
-                const client = StreamChat.getInstance(STREAM_API_KEY);
+        await currChannel.watch();
+        await currChannel.markRead();
 
-                await client.connectUser({
-                  id:authUser._id,
-                  name:authUser.fullName,
-                  image:authUser.profilePic || authUser.profilepic || "",
-                },tokenData.token)
+        setChannel(currChannel);
+      } catch (error) {
+        console.error("Error watching stream channel:", error);
+        toast.error("Could not load conversation. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-                const channelId=[authUser._id,targetUserId].sort().join("_");
-
-                //you and me
-                //if i start the chat=>channelId:[myId,yourId]
-                //if you start the chat=>channelId:[yourId,myId]
-                //that's why we are sort this to make it uniuqe
-
-                const currChannel=client.channel("messaging",channelId,{
-                  members:[authUser._id,targetUserId],
-                });
-                await currChannel.watch();
-                setChatClient(client);
-                setChannel(currChannel);
-              }catch(error){
-                  console.log("Error initializing stream chat client:",error);
-                  toast.error("Could not connect to chat. Please try again.");
-              }
-              finally{
-                setLoading(false);
-              }
-        };
-        initChat();
-      },[tokenData,authUser,targetUserId]);
+    initChannel();
+  }, [chatClient, isChatReady, authUser, targetUserId]);
 
       const handleVideoCall=()=>{
            if (channel) {
