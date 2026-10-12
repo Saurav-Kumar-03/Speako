@@ -132,7 +132,14 @@ const Navbar = () => {
               className="avatar hover:opacity-80 transition-opacity duration-200 hidden sm:block"
             >
               <div className="w-9 rounded-full">
-                <img src={authUser?.profilePic||"p7.png"} alt="User Avatar" />
+                <img
+                  src={authUser?.profilePic || "/p7.png"}
+                  alt="User Avatar"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/p7.png";
+                  }}
+                />
               </div>
             </Link>
 

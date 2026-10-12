@@ -112,8 +112,15 @@ const HomePage = () => {
                   >
                     <div className="card-body p-5 space-y-4">
                       <div className="flex items-center gap-3">
-                        <div className="avatar size-16 rounded-full">
-                          <img src={user?.profilePic||"p7.png"} alt={user.fullName} />
+                        <div className="avatar size-16 rounded-full overflow-hidden">
+                          <img
+                            src={user?.profilePic || "/p7.png"}
+                            alt={user.fullName}
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "/p7.png";
+                            }}
+                          />
                         </div>
 
                         <div>

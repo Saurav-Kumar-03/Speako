@@ -43,8 +43,8 @@ const CallPage = () => {
         console.log("Initializing Stream | Client...");
         const user = {
           id: authUser._id,
-          name: authUser.fullname,
-          image: authUser.profilePic,
+          name: authUser.fullName || authUser.fullname,
+          image: authUser.profilePic || "/p7.png",
         }
         const videoClient = new StreamVideoClient({
           apiKey: STREAM_API_KEY,

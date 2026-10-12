@@ -162,8 +162,8 @@ export async function verifyOtp(req, res) {
     }
 
     // Prepare User document with default values and schema validation
-    const idx = Math.floor(Math.random() * 100) + 1;
-    const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
+    const avatarSeed = Math.random().toString(36).substring(2, 10);
+    const randomAvatar = `https://api.dicebear.com/9.x/avataaars/png?seed=${avatarSeed}`;
 
     const userInstance = new User({
       fullName: pendingUser.fullName,
@@ -331,7 +331,7 @@ export function logout(req, res) {
 export async function onboard(req, res) {
   try {
     const userId = req.user._id;
-    const { fullName, bio, nativeLanguage, learningLanguage, location } = req.body;
+    const { fullName, bio, nativeLanguage, learningLanguage, location, profilePic } = req.body;
 
     if (!fullName || !bio || !nativeLanguage || !learningLanguage || !location) {
       return res.status(400).json({
@@ -345,12 +345,23 @@ export async function onboard(req, res) {
         ].filter(Boolean),
       });
     }
+
+    const updateFields = {
+      fullName: fullName.trim(),
+      bio: bio.trim(),
+      nativeLanguage,
+      learningLanguage,
+      location: location.trim(),
+      isOnboarded: true,
+    };
+
+    if (profilePic !== undefined) {
+      updateFields.profilePic = profilePic;
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      {
-        ...req.body,
-        isOnboarded: true,
-      },
+      updateFields,
       { new: true }
     );
 

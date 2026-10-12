@@ -1,6 +1,5 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react';
 import useAuthUser from '../hooks/useAuthUser';
-import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { completeOnboarding } from '../lib/api';
@@ -8,12 +7,27 @@ import { CameraIcon, LoaderIcon, MapPinIcon, ShipWheelIcon, ShuffleIcon } from '
 import { LANGUAGES } from '../constants';
 import { useNavigate } from 'react-router';
 
-const OnboardingPage = () => {
+const AVATAR_STYLES = [
+  "avataaars",
+  "bottts",
+  "lorelei",
+  "adventurer",
+  "micah",
+  "personas",
+];
 
-    const {authUser} =useAuthUser();
-    const queryClient=useQueryClient();
-  const navigate=useNavigate();
-    const [formState, setFormState] = useState({
+const generateRandomAvatarUrl = () => {
+  const randomStyle = AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)];
+  const seed = Math.random().toString(36).substring(2, 10);
+  return `https://api.dicebear.com/9.x/${randomStyle}/png?seed=${seed}`;
+};
+
+const OnboardingPage = () => {
+  const { authUser } = useAuthUser();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const [formState, setFormState] = useState({
     fullName: authUser?.fullName || "",
     bio: authUser?.bio || "",
     nativeLanguage: authUser?.nativeLanguage || "",
@@ -22,56 +36,110 @@ const OnboardingPage = () => {
     profilePic: authUser?.profilePic || "",
   });
 
-    const {mutate:onboardingMutation,isPending}=useMutation({
-      mutationFn:completeOnboarding,
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
-      onSuccess: async()=>{
-        toast.success("Profile updated successfully");
-     
-       await queryClient.invalidateQueries({queryKey:['authUser']});
-          // Add small delay to ensure state is synced
-    setTimeout(() => {
+  useEffect(() => {
+    if (authUser) {
+      setFormState((prev) => ({
+        fullName: prev.fullName || authUser.fullName || "",
+        bio: prev.bio || authUser.bio || "",
+        nativeLanguage: prev.nativeLanguage || authUser.nativeLanguage || "",
+        learningLanguage: prev.learningLanguage || authUser.learningLanguage || "",
+        location: prev.location || authUser.location || "",
+        profilePic: prev.profilePic || authUser.profilePic || "",
+      }));
+    }
+  }, [authUser]);
+
+  const { mutate: onboardingMutation, isPending } = useMutation({
+    mutationFn: completeOnboarding,
+    onSuccess: async (data) => {
+      toast.success("Profile updated successfully");
+      if (data?.user) {
+        queryClient.setQueryData(["authUser"], { success: true, user: data.user });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       navigate("/");
-    }, 100); // or use a promise-based delay
-         
-      },
-      onError:(error)=>
-        {
-          toast.error(error.response.data.message);
-          console.log(error);
-        },
-        
-    })
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to update profile");
+      console.error("Onboarding error:", error);
+    },
+  });
 
-    const handleSubmit=(e)=>{
-      e.preventDefault();
-      onboardingMutation(formState);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formState.fullName.trim()) {
+      return toast.error("Full name is required");
     }
+    if (!formState.bio.trim()) {
+      return toast.error("Bio is required");
+    }
+    if (!formState.nativeLanguage) {
+      return toast.error("Please select your native language");
+    }
+    if (!formState.learningLanguage) {
+      return toast.error("Please select your learning language");
+    }
+    if (!formState.location.trim()) {
+      return toast.error("Location is required");
+    }
+    onboardingMutation(formState);
+  };
 
-    const handleRandomAvatar=()=>{
-         const idx = Math.floor(Math.random() * 100) + 1; // 1-100 included
-    const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
-
-    setFormState({ ...formState, profilePic: randomAvatar });
+  const handleRandomAvatar = () => {
+    const randomAvatar = generateRandomAvatarUrl();
+    setImageError(false);
+    setIsImageLoading(true);
+    setFormState((prev) => ({ ...prev, profilePic: randomAvatar }));
     toast.success("Random profile picture generated!");
-    }
+  };
 
   return (
     <div className='min-h-screen bg-base-100 flex items-center justify-center p-4 '>
       <div className='card bg-base-200 w-full max-w-3xl shadow-xl '>
-          <div className='card-body p-6 sm:p-8'>
-             <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">Complete Your Profile</h1>
-              <form onSubmit={handleSubmit} className='space-y-6'>
-                {/* PROFILE PICTURE */}
-                <div className="flex flex-col items-center justify-center space-y-4">
+        <div className='card-body p-6 sm:p-8'>
+          <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">Complete Your Profile</h1>
+          <form onSubmit={handleSubmit} className='space-y-6'>
+            {/* PROFILE PICTURE */}
+            <div className="flex flex-col items-center justify-center space-y-4">
               {/* IMAGE PREVIEW */}
-              <div className="size-32 rounded-full bg-base-300 overflow-hidden">
-                {formState.profilePic ? (
-                  <img
-                    src={formState.profilePic}
-                    alt="Profile Preview"
-                    className="w-full h-full object-cover"
-                  />
+              <div className="relative size-32 rounded-full bg-base-300 overflow-hidden border-2 border-primary/20 shadow-md flex items-center justify-center">
+                {formState.profilePic && !imageError ? (
+                  <>
+                    {isImageLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-base-300/80 z-10">
+                        <LoaderIcon className="animate-spin size-8 text-primary" />
+                      </div>
+                    )}
+                    <img
+                      key={formState.profilePic}
+                      src={formState.profilePic}
+                      alt="Profile Preview"
+                      className={`w-full h-full object-cover transition-opacity duration-200 ${
+                        isImageLoading ? "opacity-0" : "opacity-100"
+                      }`}
+                      onLoad={() => setIsImageLoading(false)}
+                      onError={() => {
+                        setIsImageLoading(false);
+                        setImageError(true);
+                        toast.error("Failed to load avatar image. Please try generating another.");
+                      }}
+                    />
+                  </>
+                ) : imageError ? (
+                  <div className="flex flex-col items-center justify-center h-full p-2 text-center text-error">
+                    <CameraIcon className="size-8 mb-1 opacity-70" />
+                    <span className="text-xs font-medium">Failed to load</span>
+                    <button
+                      type="button"
+                      onClick={handleRandomAvatar}
+                      className="text-xs text-primary underline mt-1 hover:opacity-80"
+                    >
+                      Try another
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <CameraIcon className="size-12 text-base-content opacity-40" />
@@ -81,8 +149,17 @@ const OnboardingPage = () => {
 
               {/* Generate Random Avatar BTN */}
               <div className="flex items-center gap-2">
-                <button type="button" onClick={handleRandomAvatar} className="btn border-t-green-900 bg-green-600 hover:bg-green-500">
-                  <ShuffleIcon className="size-4 mr-2" />
+                <button
+                  type="button"
+                  onClick={handleRandomAvatar}
+                  disabled={isImageLoading}
+                  className="btn border-t-green-900 bg-green-600 hover:bg-green-500 text-white"
+                >
+                  {isImageLoading ? (
+                    <LoaderIcon className="animate-spin size-4 mr-2" />
+                  ) : (
+                    <ShuffleIcon className="size-4 mr-2" />
+                  )}
                   Generate Random Avatar
                 </button>
               </div>  

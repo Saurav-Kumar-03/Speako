@@ -50,8 +50,15 @@ const NotificationPage = () => {
                       <div className="card-body p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="avatar w-14 h-14 rounded-full bg-base-300">
-                              <img src={request.sender?.profilePic||"p7.png" } alt={request.sender?.fullName} />
+                            <div className="avatar w-14 h-14 rounded-full bg-base-300 overflow-hidden">
+                              <img
+                                src={request.sender?.profilePic || "/p7.png"}
+                                alt={request.sender?.fullName}
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = "/p7.png";
+                                }}
+                              />
                             </div>
                             <div>
                               <h3 className="font-semibold">{request.sender?.fullName}</h3>
@@ -94,10 +101,14 @@ const NotificationPage = () => {
                     <div key={notification._id} className="card bg-base-200 shadow-sm">
                       <div className="card-body p-4">
                         <div className="flex items-start gap-3">
-                          <div className="avatar mt-1 size-10 rounded-full">
+                          <div className="avatar mt-1 size-10 rounded-full overflow-hidden">
                             <img
-                              src={notification.recipient?.profilePic||"p7.png"}
+                              src={notification.recipient?.profilePic || "/p7.png"}
                               alt={notification.recipient.fullName}
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "/p7.png";
+                              }}
                             />
                           </div>
                           <div className="flex-1">
