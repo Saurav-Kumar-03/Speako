@@ -333,31 +333,32 @@ export async function onboard(req, res) {
     const userId = req.user._id;
     const { fullName, bio, nativeLanguage, learningLanguage, location, profilePic } = req.body;
 
-    if (!fullName || !bio || !nativeLanguage || !learningLanguage || !location) {
-      return res.status(400).json({
-        message: "All fields are required",
-        missingFields: [
-          !fullName && "fullName",
-          !bio && "bio",
-          !nativeLanguage && "nativeLanguage",
-          !learningLanguage && "learningLanguage",
-          !location && "location",
-        ].filter(Boolean),
-      });
+    // For first-time onboarding, require all basic fields
+    if (!req.user.isOnboarded) {
+      if (!fullName || !bio || !nativeLanguage || !learningLanguage || !location) {
+        return res.status(400).json({
+          message: "All fields are required to complete onboarding",
+          missingFields: [
+            !fullName && "fullName",
+            !bio && "bio",
+            !nativeLanguage && "nativeLanguage",
+            !learningLanguage && "learningLanguage",
+            !location && "location",
+          ].filter(Boolean),
+        });
+      }
     }
 
     const updateFields = {
-      fullName: fullName.trim(),
-      bio: bio.trim(),
-      nativeLanguage,
-      learningLanguage,
-      location: location.trim(),
       isOnboarded: true,
     };
 
-    if (profilePic !== undefined) {
-      updateFields.profilePic = profilePic;
-    }
+    if (fullName) updateFields.fullName = fullName.trim();
+    if (bio !== undefined) updateFields.bio = bio.trim();
+    if (nativeLanguage) updateFields.nativeLanguage = nativeLanguage;
+    if (learningLanguage) updateFields.learningLanguage = learningLanguage;
+    if (location !== undefined) updateFields.location = location.trim();
+    if (profilePic !== undefined) updateFields.profilePic = profilePic;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,

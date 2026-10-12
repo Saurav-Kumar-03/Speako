@@ -3,7 +3,7 @@ import useAuthUser from '../hooks/useAuthUser';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { completeOnboarding } from '../lib/api';
-import { CameraIcon, LoaderIcon, MapPinIcon, ShipWheelIcon, ShuffleIcon } from 'lucide-react';
+import { CameraIcon, CheckIcon, LoaderIcon, MapPinIcon, ShipWheelIcon, ShuffleIcon } from 'lucide-react';
 import { LANGUAGES } from '../constants';
 import { useNavigate } from 'react-router';
 
@@ -22,18 +22,29 @@ const generateRandomAvatarUrl = () => {
   return `https://api.dicebear.com/9.x/${randomStyle}/png?seed=${seed}`;
 };
 
+const isValidAvatarUrl = (url) => {
+  if (!url || typeof url !== "string") return false;
+  if (url.includes("avatar.iran.liara.run")) return false; // Known dead service
+  return true;
+};
+
 const OnboardingPage = () => {
   const { authUser } = useAuthUser();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const [formState, setFormState] = useState({
-    fullName: authUser?.fullName || "",
-    bio: authUser?.bio || "",
-    nativeLanguage: authUser?.nativeLanguage || "",
-    learningLanguage: authUser?.learningLanguage || "",
-    location: authUser?.location || "",
-    profilePic: authUser?.profilePic || "",
+  const [formState, setFormState] = useState(() => {
+    const validPic = isValidAvatarUrl(authUser?.profilePic)
+      ? authUser.profilePic
+      : generateRandomAvatarUrl();
+    return {
+      fullName: authUser?.fullName || "",
+      bio: authUser?.bio || "",
+      nativeLanguage: authUser?.nativeLanguage || "",
+      learningLanguage: authUser?.learningLanguage || "",
+      location: authUser?.location || "",
+      profilePic: validPic,
+    };
   });
 
   const [isImageLoading, setIsImageLoading] = useState(false);
@@ -41,14 +52,22 @@ const OnboardingPage = () => {
 
   useEffect(() => {
     if (authUser) {
-      setFormState((prev) => ({
-        fullName: prev.fullName || authUser.fullName || "",
-        bio: prev.bio || authUser.bio || "",
-        nativeLanguage: prev.nativeLanguage || authUser.nativeLanguage || "",
-        learningLanguage: prev.learningLanguage || authUser.learningLanguage || "",
-        location: prev.location || authUser.location || "",
-        profilePic: prev.profilePic || authUser.profilePic || "",
-      }));
+      setFormState((prev) => {
+        const validExisting = isValidAvatarUrl(prev.profilePic)
+          ? prev.profilePic
+          : isValidAvatarUrl(authUser.profilePic)
+          ? authUser.profilePic
+          : generateRandomAvatarUrl();
+
+        return {
+          fullName: prev.fullName || authUser.fullName || "",
+          bio: prev.bio || authUser.bio || "",
+          nativeLanguage: prev.nativeLanguage || authUser.nativeLanguage || "",
+          learningLanguage: prev.learningLanguage || authUser.learningLanguage || "",
+          location: prev.location || authUser.location || "",
+          profilePic: validExisting,
+        };
+      });
     }
   }, [authUser]);
 
@@ -96,11 +115,20 @@ const OnboardingPage = () => {
     toast.success("Random profile picture generated!");
   };
 
+  const handleSaveAvatarDirectly = () => {
+    if (!formState.profilePic) {
+      return toast.error("Please generate or select an avatar first");
+    }
+    onboardingMutation(formState);
+  };
+
   return (
     <div className='min-h-screen bg-base-100 flex items-center justify-center p-4 '>
       <div className='card bg-base-200 w-full max-w-3xl shadow-xl '>
         <div className='card-body p-6 sm:p-8'>
-          <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">Complete Your Profile</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">
+            {authUser?.isOnboarded ? "Update Your Profile" : "Complete Your Profile"}
+          </h1>
           <form onSubmit={handleSubmit} className='space-y-6'>
             {/* PROFILE PICTURE */}
             <div className="flex flex-col items-center justify-center space-y-4">
@@ -147,13 +175,13 @@ const OnboardingPage = () => {
                 )}
               </div>
 
-              {/* Generate Random Avatar BTN */}
-              <div className="flex items-center gap-2">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   type="button"
                   onClick={handleRandomAvatar}
-                  disabled={isImageLoading}
-                  className="btn border-t-green-900 bg-green-600 hover:bg-green-500 text-white"
+                  disabled={isImageLoading || isPending}
+                  className="btn border-t-green-900 bg-green-600 hover:bg-green-500 text-white btn-sm sm:btn-md"
                 >
                   {isImageLoading ? (
                     <LoaderIcon className="animate-spin size-4 mr-2" />
@@ -162,6 +190,23 @@ const OnboardingPage = () => {
                   )}
                   Generate Random Avatar
                 </button>
+
+                {authUser?.isOnboarded && (
+                  <button
+                    type="button"
+                    onClick={handleSaveAvatarDirectly}
+                    disabled={isPending || isImageLoading || !formState.profilePic}
+                    className="btn btn-outline btn-primary btn-sm sm:btn-md"
+                    title="Save this avatar immediately to your profile"
+                  >
+                    {isPending ? (
+                      <LoaderIcon className="animate-spin size-4 mr-2" />
+                    ) : (
+                      <CheckIcon className="size-4 mr-2" />
+                    )}
+                    Save Avatar Now
+                  </button>
+                )}
               </div>  
             </div>
             {/* FULL NAME */}
@@ -254,16 +299,16 @@ const OnboardingPage = () => {
               </div>
             </div>
             {/* SUBMIT BUTTON */}
-                <button className="btn border-t-green-900 bg-green-600 hover:bg-green-500 w-full" disabled={isPending} type="submit">
+            <button className="btn border-t-green-900 bg-green-600 hover:bg-green-500 w-full text-white" disabled={isPending} type="submit">
               {!isPending ? (
                 <>
                   <ShipWheelIcon className="size-5 mr-2" />
-                  Complete Onboarding
+                  {authUser?.isOnboarded ? "Save Changes" : "Complete Onboarding"}
                 </>
               ) : (
                 <>
                   <LoaderIcon className="animate-spin size-5 mr-2" />
-                  Onboarding...
+                  Saving...
                 </>
               )}
             </button>

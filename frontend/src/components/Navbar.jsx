@@ -126,15 +126,17 @@ const Navbar = () => {
               <ThemeSelector />
             </div>
 
-            {/* Profile - only sm+ */}
+            {/* Profile - visible on all screens */}
             <Link
               to="/onboarding"
-              className="avatar hover:opacity-80 transition-opacity duration-200 hidden sm:block"
+              className="avatar hover:opacity-80 transition-opacity duration-200 flex items-center"
+              title="Profile"
             >
-              <div className="w-9 rounded-full">
+              <div className="w-9 h-9 rounded-full overflow-hidden border border-base-300">
                 <img
                   src={authUser?.profilePic || "/p7.png"}
                   alt="User Avatar"
+                  className="w-full h-full object-cover"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = "/p7.png";
@@ -174,7 +176,27 @@ const Navbar = () => {
               
 
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-base-100 border border-base-300 shadow-lg rounded-box z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-base-100 border border-base-300 shadow-xl rounded-box z-50">
+                  <div className="p-3 border-b border-base-300 flex items-center gap-3">
+                    <div className="avatar size-10 rounded-full overflow-hidden border border-primary/30">
+                      <img
+                        src={authUser?.profilePic || "/p7.png"}
+                        alt="User Avatar"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/p7.png";
+                        }}
+                      />
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="font-semibold text-sm truncate">{authUser?.fullName || "User"}</p>
+                      <p className="text-xs text-success flex items-center gap-1">
+                        <span className="size-1.5 rounded-full bg-success inline-block" />
+                        Online
+                      </p>
+                    </div>
+                  </div>
                   <ul className="menu menu-sm p-2">
                     <li>
                       <button onClick={() => handleNav("/")}>

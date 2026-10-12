@@ -14,8 +14,10 @@ import { capitialize } from "../lib/utils";
 import FriendCard, { getLanguageFlag } from "../components/FriendCard";
 import NoFriendsFound from "../components/NoFriendsFound";
 import toast from "react-hot-toast";
+import useAuthUser from "../hooks/useAuthUser";
 
 const HomePage = () => {
+  const { authUser } = useAuthUser();
   const queryClient = useQueryClient();
   const [outgoingRequestsIds, setOutgoingRequestsIds] = useState(new Set());
 
@@ -54,7 +56,41 @@ const HomePage = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="container mx-auto space-y-10">
+      <div className="container mx-auto space-y-8">
+        {/* LOGGED IN USER PROFILE HERO */}
+        <div className="card bg-base-200 border border-base-300 shadow-sm p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <Link
+                to="/onboarding"
+                className="avatar size-14 sm:size-16 rounded-full overflow-hidden border-2 border-primary hover:opacity-85 transition-opacity shrink-0"
+                title="Edit Profile"
+              >
+                <img
+                  src={authUser?.profilePic || "/p7.png"}
+                  alt={authUser?.fullName || "User"}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/p7.png";
+                  }}
+                />
+              </Link>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold truncate">
+                  Welcome, {authUser?.fullName || "Learner"}! 👋
+                </h1>
+                <p className="text-xs sm:text-sm opacity-70 mt-0.5">
+                  Native: <span className="font-semibold text-secondary capitalize">{authUser?.nativeLanguage || "None"}</span> • Learning: <span className="font-semibold text-primary capitalize">{authUser?.learningLanguage || "Languages"}</span>
+                </p>
+              </div>
+            </div>
+            <Link to="/onboarding" className="btn btn-outline btn-sm sm:btn-md w-full sm:w-auto">
+              Edit Profile
+            </Link>
+          </div>
+        </div>
+
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Your Friends</h2>
           <Link to="/notifications" className="btn btn-outline btn-sm">
